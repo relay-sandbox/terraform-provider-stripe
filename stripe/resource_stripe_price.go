@@ -2,7 +2,6 @@ package stripe
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"strconv"
 
@@ -342,5 +341,15 @@ func resourceStripePriceUpdate(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceStripePriceDelete(d *schema.ResourceData, m interface{}) error {
-	return fmt.Errorf("[WARNING] Stripe doesn't allow deleting prices via the API. Your state file contains at least one (\"%v\") that needs deletion. Please remove it manually.", d.Id())
+	client := m.(*client.API)
+	params := stripe.PriceParams{
+		Active: stripe.Bool(false),
+	}
+
+	if _, err := client.Prices.Update(d.Id(), &params); err != nil {
+		return err
+	}
+
+	d.SetId("")
+	return nil
 }
