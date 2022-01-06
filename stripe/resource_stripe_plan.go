@@ -5,8 +5,8 @@ import (
 
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/hashicorp/terraform/helper/validation"
-	stripe "github.com/stripe/stripe-go/v71"
-	"github.com/stripe/stripe-go/v71/client"
+	stripe "github.com/stripe/stripe-go/v72"
+	"github.com/stripe/stripe-go/v72/client"
 )
 
 func resourceStripePlan() *schema.Resource {
@@ -263,7 +263,11 @@ func resourceStripePlanCreate(d *schema.ResourceData, m interface{}) error {
 
 func resourceStripePlanRead(d *schema.ResourceData, m interface{}) error {
 	client := m.(*client.API)
-	plan, err := client.Plans.Get(d.Id(), nil)
+
+	params := &stripe.PlanParams{}
+	params.AddExpand("tiers")
+
+	plan, err := client.Plans.Get(d.Id(), params)
 
 	if err != nil {
 		d.SetId("")
