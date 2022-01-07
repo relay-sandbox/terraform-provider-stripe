@@ -2,7 +2,7 @@ terraform {
   required_providers {
     stripe = {
       source = "relay-sandbox/stripe"
-      version = "1.8.0"
+      version = "0.1.0"
     }
   }
 }
