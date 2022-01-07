@@ -1,127 +1,127 @@
 package stripe
 
 import (
-	"errors"
+	"context"
+	"fmt"
 	"log"
 	"strconv"
 
-	"github.com/hashicorp/terraform/helper/customdiff"
-	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/hashicorp/terraform/helper/validation"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	stripe "github.com/stripe/stripe-go/v72"
 	"github.com/stripe/stripe-go/v72/client"
 )
 
 func resourceStripePrice() *schema.Resource {
 	return &schema.Resource{
-		Create: resourceStripePriceCreate,
-		Read:   resourceStripePriceRead,
-		Update: resourceStripePriceUpdate,
-		Delete: resourceStripePriceDelete,
+		CreateContext: resourceStripePriceCreate,
+		ReadContext:   resourceStripePriceRead,
+		UpdateContext: resourceStripePriceUpdate,
+		DeleteContext: resourceStripePriceDelete,
 		Importer: &schema.ResourceImporter{
-			State: schema.ImportStatePassthrough,
+			StateContext: schema.ImportStatePassthroughContext,
 		},
 
 		Schema: map[string]*schema.Schema{
-			"price_id": &schema.Schema{
+			"price_id": {
 				Type:     schema.TypeString,
 				Optional: true,
 				Computed: true,
 				ForceNew: true,
 			},
-			"active": &schema.Schema{
+			"active": {
 				Type:     schema.TypeBool,
 				Optional: true,
 				Default:  true,
 			},
-			"currency": &schema.Schema{
+			"currency": {
 				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
 			},
-			"metadata": &schema.Schema{
+			"metadata": {
 				Type: schema.TypeMap,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
 				Optional: true,
 			},
-			"nickname": &schema.Schema{
+			"nickname": {
 				Type:     schema.TypeString,
 				Optional: true,
 			},
-			"product": &schema.Schema{
+			"product": {
 				Type:     schema.TypeString,
 				Optional: true,
 				ForceNew: true,
 			},
-			"recurring": &schema.Schema{
+			"recurring": {
 				Type: schema.TypeMap,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
 				Optional: true,
 			},
-			"unit_amount": &schema.Schema{
+			"unit_amount": {
 				Type:     schema.TypeInt,
 				Computed: true,
 				Optional: true,
 				ForceNew: true,
 			},
-			"unit_amount_decimal": &schema.Schema{
+			"unit_amount_decimal": {
 				Type:     schema.TypeFloat,
 				Computed: true,
 				Optional: true,
 				ForceNew: true,
 			},
-			"billing_scheme": &schema.Schema{
+			"billing_scheme": {
 				Type:     schema.TypeString,
 				Optional: true,
 				ForceNew: true,
 			},
-			"created": &schema.Schema{
+			"created": {
 				Type:     schema.TypeInt,
 				Computed: true,
 			},
-			"livemode": &schema.Schema{
+			"livemode": {
 				Type:     schema.TypeBool,
 				Computed: true,
 			},
-			"tier": &schema.Schema{
+			"tier": {
 				Type: schema.TypeList,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
-						"up_to": &schema.Schema{
-							Type:          schema.TypeInt,
-							Optional:      true,
-							ForceNew:      true,
-							ConflictsWith: []string{"tier.up_to_inf"},
+						"up_to": {
+							Type:     schema.TypeInt,
+							Optional: true,
+							ForceNew: true,
 						},
-						"up_to_inf": &schema.Schema{
-							Type:          schema.TypeBool,
-							Optional:      true,
-							ForceNew:      true,
-							ConflictsWith: []string{"tier.up_to"},
+						"up_to_inf": {
+							Type:     schema.TypeBool,
+							Optional: true,
+							ForceNew: true,
 						},
-						"flat_amount": &schema.Schema{
+						"flat_amount": {
 							Type:     schema.TypeInt,
 							Optional: true,
 							ForceNew: true,
 							Computed: true,
 						},
-						"flat_amount_decimal": &schema.Schema{
+						"flat_amount_decimal": {
 							Type:     schema.TypeFloat,
 							Optional: true,
 							ForceNew: true,
 							Computed: true,
 						},
-						"unit_amount": &schema.Schema{
+						"unit_amount": {
 							Type:     schema.TypeInt,
 							Optional: true,
 							ForceNew: true,
 							Computed: true,
 						},
-						"unit_amount_decimal": &schema.Schema{
+						"unit_amount_decimal": {
 							Type:     schema.TypeFloat,
 							Optional: true,
 							ForceNew: true,
@@ -132,12 +132,12 @@ func resourceStripePrice() *schema.Resource {
 				Optional: true,
 				ForceNew: true,
 			},
-			"tiers_mode": &schema.Schema{
+			"tiers_mode": {
 				Type:     schema.TypeString,
 				Optional: true,
 				ForceNew: true,
 			},
-			"tax_behavior": &schema.Schema{
+			"tax_behavior": {
 				Type:         schema.TypeString,
 				Optional:     true,
 				Default:      "unspecified",
@@ -145,14 +145,14 @@ func resourceStripePrice() *schema.Resource {
 			},
 		},
 		CustomizeDiff: customdiff.All(
-			customdiff.ForceNewIfChange("tax_behavior", func(old, new, meta interface{}) bool {
+			customdiff.ForceNewIfChange("tax_behavior", func(ctx context.Context, old, new, meta interface{}) bool {
 				return old != "unspecified"
 			}),
 		),
 	}
 }
 
-func expandPriceRecurring(recurring map[string]interface{}) (*stripe.PriceRecurringParams, error) {
+func expandPriceRecurring(recurring map[string]interface{}) (*stripe.PriceRecurringParams, diag.Diagnostics) {
 	params := &stripe.PriceRecurringParams{}
 	parsed := expandStringMap(recurring)
 
@@ -167,7 +167,7 @@ func expandPriceRecurring(recurring map[string]interface{}) (*stripe.PriceRecurr
 	if intervalCount, ok := parsed["interval_count"]; ok {
 		intervalCountInt, err := strconv.ParseInt(intervalCount, 10, 64)
 		if err != nil {
-			return nil, errors.New("interval_count must be a string, representing an int (e.g. \"52\")")
+			return nil, diag.Errorf("interval_count must be a string, representing an int (e.g. \"52\")")
 		}
 		params.IntervalCount = stripe.Int64(intervalCountInt)
 	}
@@ -179,7 +179,7 @@ func expandPriceRecurring(recurring map[string]interface{}) (*stripe.PriceRecurr
 	return params, nil
 }
 
-func resourceStripePriceCreate(d *schema.ResourceData, m interface{}) error {
+func resourceStripePriceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*client.API)
 	nickname := d.Get("nickname").(string)
 	currency := d.Get("currency").(string)
@@ -187,6 +187,7 @@ func resourceStripePriceCreate(d *schema.ResourceData, m interface{}) error {
 	params := &stripe.PriceParams{
 		Currency: stripe.String(currency),
 	}
+	params.Context = ctx
 
 	if active, ok := d.GetOk("active"); ok {
 		params.Active = stripe.Bool(active.(bool))
@@ -202,19 +203,23 @@ func resourceStripePriceCreate(d *schema.ResourceData, m interface{}) error {
 		params.TiersMode = stripe.String(tiersMode.(string))
 	}
 
-	if tiers, ok := d.GetOk("tier"); ok {
-		params.Tiers = expandPriceTiers(tiers.([]interface{}))
+	priceTiers, diags := expandPriceTiers(d)
+	if diags.HasError() {
+		return diags
 	}
+	// TODO: Propagate non-error diagnostics
+	params.Tiers = priceTiers
 
 	if product, ok := d.GetOk("product"); ok {
 		params.Product = stripe.String(product.(string))
 	}
 
 	if recurring, ok := d.GetOk("recurring"); ok {
-		recurringParams, err := expandPriceRecurring(recurring.(map[string]interface{}))
-		if err != nil {
-			return err
+		recurringParams, diags := expandPriceRecurring(recurring.(map[string]interface{}))
+		if diags.HasError() {
+			return diags
 		}
+		// TODO: Propagate non-error diagnostics
 		params.Recurring = recurringParams
 	}
 
@@ -236,43 +241,46 @@ func resourceStripePriceCreate(d *schema.ResourceData, m interface{}) error {
 
 	price, err := client.Prices.New(params)
 	if err != nil {
-		return err
+		return diag.FromErr(err)
 	}
 
 	log.Printf("[INFO] Created Stripe price: %s", nickname)
 	d.SetId(price.ID)
 
-	return resourceStripePriceRead(d, m)
+	return resourceStripePriceRead(ctx, d, m)
 }
 
-func resourceStripePriceRead(d *schema.ResourceData, m interface{}) error {
+func resourceStripePriceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*client.API)
-	price, err := client.Prices.Get(d.Id(), nil)
 
+	params := &stripe.PriceParams{}
+	params.Context = ctx
+	params.AddExpand("tiers")
+
+	price, err := client.Prices.Get(d.Id(), params)
 	if err != nil {
-		d.SetId("")
-	} else {
-		d.Set("price_id", price.ID)
-		d.Set("active", price.Active)
-		d.Set("created", price.Created)
-		d.Set("currency", price.Currency)
-		d.Set("livemode", price.Livemode)
-		d.Set("metadata", price.Metadata)
-		d.Set("nickname", price.Nickname)
-		if price.Product != nil {
-			d.Set("product", price.Product.ID)
-		}
-		d.Set("recurring", price.Active)
-		d.Set("unit_amount", price.UnitAmount)
-		d.Set("unit_amount_decimal", price.UnitAmountDecimal)
-		d.Set("tiers_mode", price.TiersMode)
-		// Stripe's API doesn't return tiers.
-		// d.Set("tier", flattenPriceTiers(price.Tiers))
-		d.Set("billing_scheme", price.BillingScheme)
-		d.Set("tax_behavior", price.TaxBehavior)
+		return diag.FromErr(err)
 	}
 
-	return err
+	d.Set("price_id", price.ID)
+	d.Set("active", price.Active)
+	d.Set("created", price.Created)
+	d.Set("currency", price.Currency)
+	d.Set("livemode", price.Livemode)
+	d.Set("metadata", price.Metadata)
+	d.Set("nickname", price.Nickname)
+	if price.Product != nil {
+		d.Set("product", price.Product.ID)
+	}
+	d.Set("recurring", price.Active)
+	d.Set("unit_amount", price.UnitAmount)
+	d.Set("unit_amount_decimal", price.UnitAmountDecimal)
+	d.Set("tiers_mode", price.TiersMode)
+	d.Set("tier", flattenPriceTiers(price.Tiers))
+	d.Set("billing_scheme", price.BillingScheme)
+	d.Set("tax_behavior", price.TaxBehavior)
+
+	return nil
 }
 
 func flattenPriceTiers(in []*stripe.PriceTier) []map[string]interface{} {
@@ -290,31 +298,60 @@ func flattenPriceTiers(in []*stripe.PriceTier) []map[string]interface{} {
 	return out
 }
 
-func expandPriceTiers(in []interface{}) []*stripe.PriceTierParams {
-	out := make([]*stripe.PriceTierParams, len(in))
-	for i, v := range in {
-		tier := v.(map[string]interface{})
-		out[i] = &stripe.PriceTierParams{
-			UpTo:    stripe.Int64(int64(tier["up_to"].(int))),
-			UpToInf: stripe.Bool(tier["up_to_inf"].(bool)),
-		}
-		if tier["flat_amount"] != nil {
-			out[i].FlatAmount = stripe.Int64(int64(tier["flat_amount"].(int)))
-		} else if tier["flat_amount_decimal"] != nil {
-			out[i].FlatAmountDecimal = stripe.Float64(tier["flat_amount_decimal"].(float64))
-		}
-		if tier["unit_amount"] != nil {
-			out[i].UnitAmount = stripe.Int64(int64(tier["unit_amount"].(int)))
-		} else if tier["unit_amount_decimal"] != nil {
-			out[i].UnitAmountDecimal = stripe.Float64(tier["unit_amount_decimal"].(float64))
-		}
+func expandPriceTier(d *schema.ResourceData, idx int) (*stripe.PriceTierParams, diag.Diagnostics) {
+	params := &stripe.PriceTierParams{}
+
+	upTo, upToOK := d.GetOk(fmt.Sprintf("tier.%d.up_to", idx))
+	if upToOK {
+		params.UpTo = stripe.Int64(int64(upTo.(int)))
 	}
-	return out
+
+	upToInf, upToInfOK := d.GetOkExists(fmt.Sprintf("tier.%d.up_to_inf", idx))
+	if upToInfOK {
+		params.UpToInf = stripe.Bool(upToInf.(bool))
+	}
+
+	if upToOK && upToInfOK {
+		return nil, diag.Errorf("up_to: conflicts with up_to_inf")
+	}
+
+	if flatAmount, ok := d.GetOk(fmt.Sprintf("tier.%d.flat_amount", idx)); ok {
+		params.FlatAmount = stripe.Int64(int64(flatAmount.(int)))
+	} else if flatAmountDecimal, ok := d.GetOk(fmt.Sprintf("tier.%d.flat_amount_decimal", idx)); ok {
+		params.FlatAmountDecimal = stripe.Float64(flatAmountDecimal.(float64))
+	}
+
+	if unitAmount, ok := d.GetOk(fmt.Sprintf("tier.%d.unit_amount", idx)); ok {
+		params.UnitAmount = stripe.Int64(int64(unitAmount.(int)))
+	} else if unitAmountDecimal, ok := d.GetOk(fmt.Sprintf("tier.%d.unit_amount_decimal", idx)); ok {
+		params.UnitAmountDecimal = stripe.Float64(unitAmountDecimal.(float64))
+	}
+
+	return params, nil
 }
 
-func resourceStripePriceUpdate(d *schema.ResourceData, m interface{}) error {
+func expandPriceTiers(d *schema.ResourceData) (out []*stripe.PriceTierParams, diags diag.Diagnostics) {
+	v, ok := d.GetOk("tier")
+	if !ok {
+		return
+	}
+
+	in := v.([]interface{})
+	out = make([]*stripe.PriceTierParams, len(in))
+	for i := range in {
+		tier, tdgs := expandPriceTier(d, i)
+		out[i] = tier
+		diags = append(diags, tdgs...)
+	}
+
+	return
+}
+
+func resourceStripePriceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*client.API)
-	params := stripe.PriceParams{}
+
+	params := &stripe.PriceParams{}
+	params.Context = ctx
 
 	if d.HasChange("active") {
 		params.Active = stripe.Bool(d.Get("active").(bool))
@@ -332,22 +369,24 @@ func resourceStripePriceUpdate(d *schema.ResourceData, m interface{}) error {
 		params.TaxBehavior = stripe.String(d.Get("tax_behavior").(string))
 	}
 
-	_, err := client.Prices.Update(d.Id(), &params)
+	_, err := client.Prices.Update(d.Id(), params)
 	if err != nil {
-		return err
+		return diag.FromErr(err)
 	}
 
-	return resourceStripePriceRead(d, m)
+	return resourceStripePriceRead(ctx, d, m)
 }
 
-func resourceStripePriceDelete(d *schema.ResourceData, m interface{}) error {
+func resourceStripePriceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*client.API)
-	params := stripe.PriceParams{
+
+	params := &stripe.PriceParams{
 		Active: stripe.Bool(false),
 	}
+	params.Context = ctx
 
-	if _, err := client.Prices.Update(d.Id(), &params); err != nil {
-		return err
+	if _, err := client.Prices.Update(d.Id(), params); err != nil {
+		return diag.FromErr(err)
 	}
 
 	d.SetId("")

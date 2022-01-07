@@ -1,11 +1,13 @@
 package stripe
 
 import (
-	"github.com/hashicorp/terraform/helper/schema"
+	"context"
+
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/stripe/stripe-go/v72"
 	"github.com/stripe/stripe-go/v72/client"
 
-	"fmt"
 	"log"
 )
 
@@ -15,51 +17,51 @@ func expandAttributes(d *schema.ResourceData) []*string {
 
 func resourceStripeProduct() *schema.Resource {
 	return &schema.Resource{
-		Create: resourceStripeProductCreate,
-		Read:   resourceStripeProductRead,
-		Update: resourceStripeProductUpdate,
-		Delete: resourceStripeProductDelete,
+		CreateContext: resourceStripeProductCreate,
+		ReadContext:   resourceStripeProductRead,
+		UpdateContext: resourceStripeProductUpdate,
+		DeleteContext: resourceStripeProductDelete,
 		Importer: &schema.ResourceImporter{
-			State: schema.ImportStatePassthrough,
+			StateContext: schema.ImportStatePassthroughContext,
 		},
 
 		Schema: map[string]*schema.Schema{
-			"product_id": &schema.Schema{
+			"product_id": {
 				Type:     schema.TypeString,
 				Optional: true,
 				Computed: true,
 				ForceNew: true,
 			},
-			"name": &schema.Schema{
+			"name": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
-			"type": &schema.Schema{
+			"type": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
-			"active": &schema.Schema{
+			"active": {
 				Type:     schema.TypeBool,
 				Optional: true,
 				Default:  true,
 			},
-			"attributes": &schema.Schema{
+			"attributes": {
 				Type:     schema.TypeList,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 				Optional: true,
 			},
-			"metadata": &schema.Schema{
+			"metadata": {
 				Type: schema.TypeMap,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
 				Optional: true,
 			},
-			"statement_descriptor": &schema.Schema{
+			"statement_descriptor": {
 				Type:     schema.TypeString,
 				Optional: true,
 			},
-			"unit_label": &schema.Schema{
+			"unit_label": {
 				Type:     schema.TypeString,
 				Optional: true,
 			},
@@ -67,7 +69,7 @@ func resourceStripeProduct() *schema.Resource {
 	}
 }
 
-func resourceStripeProductCreate(d *schema.ResourceData, m interface{}) error {
+func resourceStripeProductCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*client.API)
 	productName := d.Get("name").(string)
 	productType := d.Get("type").(string)
@@ -82,13 +84,14 @@ func resourceStripeProductCreate(d *schema.ResourceData, m interface{}) error {
 	case "service":
 		stripeProductType = stripe.ProductTypeService
 	default:
-		return fmt.Errorf("unknown type: %s", productType)
+		return diag.Errorf("unknown type: %s", productType)
 	}
 
 	params := &stripe.ProductParams{
 		Name: stripe.String(productName),
 		Type: stripe.String(string(stripeProductType)),
 	}
+	params.Context = ctx
 
 	if productID, ok := d.GetOk("product_id"); ok {
 		params.ID = stripe.String(productID.(string))
@@ -111,23 +114,25 @@ func resourceStripeProductCreate(d *schema.ResourceData, m interface{}) error {
 	}
 
 	product, err := client.Products.New(params)
-
 	if err != nil {
-		return err
+		return diag.FromErr(err)
 	}
 
 	log.Printf("[INFO] Created Stripe product: %s", productName)
 	d.SetId(product.ID)
 
-	return resourceStripeProductRead(d, m)
+	return resourceStripeProductRead(ctx, d, m)
 }
 
-func resourceStripeProductRead(d *schema.ResourceData, m interface{}) error {
+func resourceStripeProductRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*client.API)
-	product, err := client.Products.Get(d.Id(), nil)
 
+	params := &stripe.ProductParams{}
+	params.Context = ctx
+
+	product, err := client.Products.Get(d.Id(), params)
 	if err != nil {
-		return err
+		return diag.FromErr(err)
 	}
 
 	d.Set("product_id", product.ID)
@@ -142,9 +147,11 @@ func resourceStripeProductRead(d *schema.ResourceData, m interface{}) error {
 	return nil
 }
 
-func resourceStripeProductUpdate(d *schema.ResourceData, m interface{}) error {
+func resourceStripeProductUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*client.API)
-	params := stripe.ProductParams{}
+
+	params := &stripe.ProductParams{}
+	params.Context = ctx
 
 	if d.HasChange("name") {
 		params.Name = stripe.String(d.Get("name").(string))
@@ -174,22 +181,25 @@ func resourceStripeProductUpdate(d *schema.ResourceData, m interface{}) error {
 		params.UnitLabel = stripe.String(d.Get("unit_label").(string))
 	}
 
-	_, err := client.Products.Update(d.Id(), &params)
-
+	_, err := client.Products.Update(d.Id(), params)
 	if err != nil {
-		return err
+		return diag.FromErr(err)
 	}
 
-	return resourceStripeProductRead(d, m)
+	return resourceStripeProductRead(ctx, d, m)
 }
 
-func resourceStripeProductDelete(d *schema.ResourceData, m interface{}) error {
+func resourceStripeProductDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*client.API)
-	_, err := client.Products.Del(d.Id(), nil)
 
-	if err == nil {
-		d.SetId("")
+	params := &stripe.ProductParams{}
+	params.Context = ctx
+
+	if _, err := client.Products.Del(d.Id(), params); err != nil {
+		return diag.FromErr(err)
 	}
 
-	return err
+	d.SetId("")
+
+	return nil
 }

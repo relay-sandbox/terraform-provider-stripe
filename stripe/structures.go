@@ -1,7 +1,7 @@
 package stripe
 
 import (
-	"github.com/hashicorp/terraform/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 func expandStringMap(m map[string]interface{}) map[string]string {

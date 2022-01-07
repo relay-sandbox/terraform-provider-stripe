@@ -1,127 +1,128 @@
 package stripe
 
 import (
+	"context"
+	"fmt"
 	"log"
 
-	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/hashicorp/terraform/helper/validation"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	stripe "github.com/stripe/stripe-go/v72"
 	"github.com/stripe/stripe-go/v72/client"
 )
 
 func resourceStripePlan() *schema.Resource {
 	return &schema.Resource{
-		Create: resourceStripePlanCreate,
-		Read:   resourceStripePlanRead,
-		Update: resourceStripePlanUpdate,
-		Delete: resourceStripePlanDelete,
+		CreateContext: resourceStripePlanCreate,
+		ReadContext:   resourceStripePlanRead,
+		UpdateContext: resourceStripePlanUpdate,
+		DeleteContext: resourceStripePlanDelete,
 		Importer: &schema.ResourceImporter{
-			State: schema.ImportStatePassthrough,
+			StateContext: schema.ImportStatePassthroughContext,
 		},
 
 		Schema: map[string]*schema.Schema{
-			"plan_id": &schema.Schema{
+			"plan_id": {
 				Type:     schema.TypeString,
 				Optional: true,
 				Computed: true,
 				ForceNew: true,
 			},
-			"active": &schema.Schema{
+			"active": {
 				Type:     schema.TypeBool,
 				Optional: true,
 				Default:  true,
 			},
-			"amount": &schema.Schema{
+			"amount": {
 				Type:          schema.TypeInt,
 				Optional:      true,
 				ForceNew:      true,
 				Computed:      true,
 				ConflictsWith: []string{"amount_decimal"},
 			},
-			"amount_decimal": &schema.Schema{
+			"amount_decimal": {
 				Type:          schema.TypeFloat,
 				Optional:      true,
 				ForceNew:      true,
 				Computed:      true,
 				ConflictsWith: []string{"amount"},
 			},
-			"currency": &schema.Schema{
+			"currency": {
 				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
 			},
-			"interval": &schema.Schema{
+			"interval": {
 				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
 			},
-			"product": &schema.Schema{
+			"product": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
-			"aggregate_usage": &schema.Schema{
+			"aggregate_usage": {
 				Type:     schema.TypeString,
 				Optional: true,
 				ForceNew: true,
 			},
-			"billing_scheme": &schema.Schema{
+			"billing_scheme": {
 				Type:     schema.TypeString,
 				Optional: true,
 				ForceNew: true,
 				Default:  "per_unit",
 			},
-			"interval_count": &schema.Schema{
+			"interval_count": {
 				Type:     schema.TypeInt,
 				Optional: true,
 				ForceNew: true,
 				Default:  1,
 			},
-			"metadata": &schema.Schema{
+			"metadata": {
 				Type: schema.TypeMap,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
 				Optional: true,
 			},
-			"nickname": &schema.Schema{
+			"nickname": {
 				Type:     schema.TypeString,
 				Optional: true,
 			},
-			"tier": &schema.Schema{
+			"tier": {
 				Type: schema.TypeList,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
-						"up_to": &schema.Schema{
-							Type:          schema.TypeInt,
-							Optional:      true,
-							ForceNew:      true,
-							ConflictsWith: []string{"tier.up_to_inf"},
+						"up_to": {
+							Type:     schema.TypeInt,
+							Optional: true,
+							ForceNew: true,
 						},
-						"up_to_inf": &schema.Schema{
-							Type:          schema.TypeBool,
-							Optional:      true,
-							ForceNew:      true,
-							ConflictsWith: []string{"tier.up_to"},
+						"up_to_inf": {
+							Type:     schema.TypeBool,
+							Optional: true,
+							ForceNew: true,
 						},
-						"flat_amount": &schema.Schema{
+						"flat_amount": {
 							Type:     schema.TypeInt,
 							Optional: true,
 							ForceNew: true,
 							Computed: true,
 						},
-						"flat_amount_decimal": &schema.Schema{
+						"flat_amount_decimal": {
 							Type:     schema.TypeFloat,
 							Optional: true,
 							ForceNew: true,
 							Computed: true,
 						},
-						"unit_amount": &schema.Schema{
+						"unit_amount": {
 							Type:     schema.TypeInt,
 							Optional: true,
 							ForceNew: true,
 							Computed: true,
 						},
-						"unit_amount_decimal": &schema.Schema{
+						"unit_amount_decimal": {
 							Type:     schema.TypeFloat,
 							Optional: true,
 							ForceNew: true,
@@ -132,21 +133,21 @@ func resourceStripePlan() *schema.Resource {
 				Optional: true,
 				ForceNew: true,
 			},
-			"tiers_mode": &schema.Schema{
+			"tiers_mode": {
 				Type:     schema.TypeString,
 				Optional: true,
 				ForceNew: true,
 			},
-			"transform_usage": &schema.Schema{
+			"transform_usage": {
 				Type: schema.TypeList,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
-						"divide_by": &schema.Schema{
+						"divide_by": {
 							Type:     schema.TypeInt,
 							Required: true,
 							ForceNew: true,
 						},
-						"round": &schema.Schema{
+						"round": {
 							Type:         schema.TypeString,
 							Required:     true,
 							ForceNew:     true,
@@ -158,11 +159,11 @@ func resourceStripePlan() *schema.Resource {
 				Optional: true,
 				ForceNew: true,
 			},
-			"trial_period_days": &schema.Schema{
+			"trial_period_days": {
 				Type:     schema.TypeInt,
 				Optional: true,
 			},
-			"usage_type": &schema.Schema{
+			"usage_type": {
 				Type:     schema.TypeString,
 				Optional: true,
 				ForceNew: true,
@@ -172,7 +173,7 @@ func resourceStripePlan() *schema.Resource {
 	}
 }
 
-func resourceStripePlanCreate(d *schema.ResourceData, m interface{}) error {
+func resourceStripePlanCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*client.API)
 	planNickname := d.Get("nickname").(string)
 	planInterval := d.Get("interval").(string)
@@ -187,6 +188,7 @@ func resourceStripePlanCreate(d *schema.ResourceData, m interface{}) error {
 		ProductID: stripe.String(planProductID),
 		Currency:  stripe.String(planCurrency),
 	}
+	params.Context = ctx
 
 	amount := d.Get("amount").(int)
 	amountDecimal := d.Get("amount_decimal").(float64)
@@ -231,9 +233,12 @@ func resourceStripePlanCreate(d *schema.ResourceData, m interface{}) error {
 		params.TiersMode = stripe.String(tiersMode.(string))
 	}
 
-	if tiers, ok := d.GetOk("tier"); ok {
-		params.Tiers = expandPlanTiers(tiers.([]interface{}))
+	tiers, diags := expandPlanTiers(d)
+	if diags.HasError() {
+		return diags
 	}
+	// TODO: Propagate non-error diagnostics
+	params.Tiers = tiers
 
 	if transformUsage, ok := d.GetOk("transform_usage"); ok {
 		params.TransformUsage = expandPlanTransformUsage(transformUsage.([]interface{}))
@@ -248,50 +253,52 @@ func resourceStripePlanCreate(d *schema.ResourceData, m interface{}) error {
 	}
 
 	plan, err := client.Plans.New(params)
-
-	if err == nil {
-		if planNickname != "" {
-			log.Printf("[INFO] Create plan: %s (%s)", plan.Nickname, plan.ID)
-		} else {
-			log.Printf("[INFO] Create anonymous plan: %s", plan.ID)
-		}
-		d.SetId(plan.ID)
+	if err != nil {
+		return diag.FromErr(err)
 	}
 
-	return err
+	if plan.Nickname != "" {
+		log.Printf("[INFO] Create plan: %s (%s)", plan.Nickname, plan.ID)
+	} else {
+		log.Printf("[INFO] Create anonymous plan: %s", plan.ID)
+	}
+
+	d.SetId(plan.ID)
+
+	return nil
 }
 
-func resourceStripePlanRead(d *schema.ResourceData, m interface{}) error {
+func resourceStripePlanRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*client.API)
 
 	params := &stripe.PlanParams{}
+	params.Context = ctx
 	params.AddExpand("tiers")
 
 	plan, err := client.Plans.Get(d.Id(), params)
-
 	if err != nil {
-		d.SetId("")
-	} else {
-		d.Set("plan_id", plan.ID)
-		d.Set("active", plan.Active)
-		d.Set("aggregate_usage", plan.AggregateUsage)
-		d.Set("amount", plan.Amount)
-		d.Set("amount_decimal", plan.AmountDecimal)
-		d.Set("billing_scheme", plan.BillingScheme)
-		d.Set("currency", plan.Currency)
-		d.Set("interval", plan.Interval)
-		d.Set("interval_count", plan.IntervalCount)
-		d.Set("metadata", plan.Metadata)
-		d.Set("nickname", plan.Nickname)
-		d.Set("product", plan.Product)
-		d.Set("tiers_mode", plan.TiersMode)
-		d.Set("tier", flattenPlanTiers(plan.Tiers))
-		d.Set("transform_usage", flattenPlanTransformUsage(plan.TransformUsage))
-		d.Set("trial_period_days", plan.TrialPeriodDays)
-		d.Set("usage_type", plan.UsageType)
+		return diag.FromErr(err)
 	}
 
-	return err
+	d.Set("plan_id", plan.ID)
+	d.Set("active", plan.Active)
+	d.Set("aggregate_usage", plan.AggregateUsage)
+	d.Set("amount", plan.Amount)
+	d.Set("amount_decimal", plan.AmountDecimal)
+	d.Set("billing_scheme", plan.BillingScheme)
+	d.Set("currency", plan.Currency)
+	d.Set("interval", plan.Interval)
+	d.Set("interval_count", plan.IntervalCount)
+	d.Set("metadata", plan.Metadata)
+	d.Set("nickname", plan.Nickname)
+	d.Set("product", plan.Product)
+	d.Set("tiers_mode", plan.TiersMode)
+	d.Set("tier", flattenPlanTiers(plan.Tiers))
+	d.Set("transform_usage", flattenPlanTransformUsage(plan.TransformUsage))
+	d.Set("trial_period_days", plan.TrialPeriodDays)
+	d.Set("usage_type", plan.UsageType)
+
+	return nil
 }
 
 func flattenPlanTiers(in []*stripe.PlanTier) []map[string]interface{} {
@@ -309,26 +316,53 @@ func flattenPlanTiers(in []*stripe.PlanTier) []map[string]interface{} {
 	return out
 }
 
-func expandPlanTiers(in []interface{}) []*stripe.PlanTierParams {
-	out := make([]*stripe.PlanTierParams, len(in))
-	for i, v := range in {
-		tier := v.(map[string]interface{})
-		out[i] = &stripe.PlanTierParams{
-			UpTo:    stripe.Int64(int64(tier["up_to"].(int))),
-			UpToInf: stripe.Bool(tier["up_to_inf"].(bool)),
-		}
-		if tier["flat_amount"] != nil {
-			out[i].FlatAmount = stripe.Int64(int64(tier["flat_amount"].(int)))
-		} else if tier["flat_amount_decimal"] != nil {
-			out[i].FlatAmountDecimal = stripe.Float64(tier["flat_amount_decimal"].(float64))
-		}
-		if tier["unit_amount"] != nil {
-			out[i].UnitAmount = stripe.Int64(int64(tier["unit_amount"].(int)))
-		} else if tier["unit_amount_decimal"] != nil {
-			out[i].UnitAmountDecimal = stripe.Float64(tier["unit_amount_decimal"].(float64))
-		}
+func expandPlanTier(d *schema.ResourceData, idx int) (*stripe.PlanTierParams, diag.Diagnostics) {
+	params := &stripe.PlanTierParams{}
+
+	upTo, upToOK := d.GetOk(fmt.Sprintf("tier.%d.up_to", idx))
+	if upToOK {
+		params.UpTo = stripe.Int64(int64(upTo.(int)))
 	}
-	return out
+
+	upToInf, upToInfOK := d.GetOkExists(fmt.Sprintf("tier.%d.up_to_inf", idx))
+	if upToInfOK {
+		params.UpToInf = stripe.Bool(upToInf.(bool))
+	}
+
+	if upToOK && upToInfOK {
+		return nil, diag.Errorf("up_to: conflicts with up_to_inf")
+	}
+
+	if flatAmount, ok := d.GetOk(fmt.Sprintf("tier.%d.flat_amount", idx)); ok {
+		params.FlatAmount = stripe.Int64(int64(flatAmount.(int)))
+	} else if flatAmountDecimal, ok := d.GetOk(fmt.Sprintf("tier.%d.flat_amount_decimal", idx)); ok {
+		params.FlatAmountDecimal = stripe.Float64(flatAmountDecimal.(float64))
+	}
+
+	if unitAmount, ok := d.GetOk(fmt.Sprintf("tier.%d.unit_amount", idx)); ok {
+		params.UnitAmount = stripe.Int64(int64(unitAmount.(int)))
+	} else if unitAmountDecimal, ok := d.GetOk(fmt.Sprintf("tier.%d.unit_amount_decimal", idx)); ok {
+		params.UnitAmountDecimal = stripe.Float64(unitAmountDecimal.(float64))
+	}
+
+	return params, nil
+}
+
+func expandPlanTiers(d *schema.ResourceData) (out []*stripe.PlanTierParams, diags diag.Diagnostics) {
+	v, ok := d.GetOk("tier")
+	if !ok {
+		return
+	}
+
+	in := v.([]interface{})
+	out = make([]*stripe.PlanTierParams, len(in))
+	for i := range in {
+		tier, tdgs := expandPlanTier(d, i)
+		out[i] = tier
+		diags = append(diags, tdgs...)
+	}
+
+	return
 }
 
 func flattenPlanTransformUsage(in *stripe.PlanTransformUsage) []map[string]interface{} {
@@ -338,7 +372,7 @@ func flattenPlanTransformUsage(in *stripe.PlanTransformUsage) []map[string]inter
 	}
 	out := make([]map[string]interface{}, n)
 
-	for i, _ := range out {
+	for i := range out {
 		out[i] = map[string]interface{}{
 			"divide_by": in.DivideBy,
 			"round":     in.Round,
@@ -360,9 +394,11 @@ func expandPlanTransformUsage(in []interface{}) *stripe.PlanTransformUsageParams
 	return out
 }
 
-func resourceStripePlanUpdate(d *schema.ResourceData, m interface{}) error {
+func resourceStripePlanUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*client.API)
-	params := stripe.PlanParams{}
+
+	params := &stripe.PlanParams{}
+	params.Context = ctx
 
 	if d.HasChange("plan_id") {
 		params.ID = stripe.String(d.Get("plan_id").(string))
@@ -384,22 +420,24 @@ func resourceStripePlanUpdate(d *schema.ResourceData, m interface{}) error {
 		params.TrialPeriodDays = stripe.Int64(int64(d.Get("trial_period_days").(int)))
 	}
 
-	_, err := client.Plans.Update(d.Id(), &params)
-
-	if err != nil {
-		return err
+	if _, err := client.Plans.Update(d.Id(), params); err != nil {
+		return diag.FromErr(err)
 	}
 
-	return resourceStripePlanRead(d, m)
+	return resourceStripePlanRead(ctx, d, m)
 }
 
-func resourceStripePlanDelete(d *schema.ResourceData, m interface{}) error {
+func resourceStripePlanDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*client.API)
-	_, err := client.Plans.Del(d.Id(), nil)
 
-	if err == nil {
-		d.SetId("")
+	params := &stripe.PlanParams{}
+	params.Context = ctx
+
+	if _, err := client.Plans.Del(d.Id(), params); err != nil {
+		return diag.FromErr(err)
 	}
 
-	return err
+	d.SetId("")
+
+	return nil
 }

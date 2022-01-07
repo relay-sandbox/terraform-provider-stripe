@@ -1,7 +1,10 @@
 package stripe
 
 import (
-	"github.com/hashicorp/terraform/helper/schema"
+	"context"
+
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	stripe "github.com/stripe/stripe-go/v72"
 	"github.com/stripe/stripe-go/v72/client"
 
@@ -10,30 +13,30 @@ import (
 
 func resourceStripeWebhookEndpoint() *schema.Resource {
 	return &schema.Resource{
-		Create: resourceStripeWebhookEndpointCreate,
-		Read:   resourceStripeWebhookEndpointRead,
-		Update: resourceStripeWebhookEndpointUpdate,
-		Delete: resourceStripeWebhookEndpointDelete,
+		CreateContext: resourceStripeWebhookEndpointCreate,
+		ReadContext:   resourceStripeWebhookEndpointRead,
+		UpdateContext: resourceStripeWebhookEndpointUpdate,
+		DeleteContext: resourceStripeWebhookEndpointDelete,
 		Importer: &schema.ResourceImporter{
-			State: schema.ImportStatePassthrough,
+			StateContext: schema.ImportStatePassthroughContext,
 		},
 
 		Schema: map[string]*schema.Schema{
-			"url": &schema.Schema{
+			"url": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
-			"enabled_events": &schema.Schema{
+			"enabled_events": {
 				Type:     schema.TypeList,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 				Required: true,
 			},
-			"connect": &schema.Schema{
+			"connect": {
 				Type:     schema.TypeBool,
 				Optional: true,
 				ForceNew: true,
 			},
-			"secret": &schema.Schema{
+			"secret": {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
@@ -41,7 +44,7 @@ func resourceStripeWebhookEndpoint() *schema.Resource {
 	}
 }
 
-func resourceStripeWebhookEndpointCreate(d *schema.ResourceData, m interface{}) error {
+func resourceStripeWebhookEndpointCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*client.API)
 	url := d.Get("url").(string)
 
@@ -49,28 +52,33 @@ func resourceStripeWebhookEndpointCreate(d *schema.ResourceData, m interface{}) 
 		URL:           stripe.String(url),
 		EnabledEvents: expandStringList(d, "enabled_events"),
 	}
+	params.Context = ctx
 
 	if connect, ok := d.GetOk("connect"); ok {
 		params.Connect = stripe.Bool(connect.(bool))
 	}
 
 	webhookEndpoint, err := client.WebhookEndpoints.New(params)
-
-	if err == nil {
-		log.Printf("[INFO] Create webbook endpoint: %s", url)
-		d.SetId(webhookEndpoint.ID)
-		d.Set("secret", webhookEndpoint.Secret)
+	if err != nil {
+		return diag.FromErr(err)
 	}
 
-	return err
+	log.Printf("[INFO] Create webbook endpoint: %s", url)
+	d.SetId(webhookEndpoint.ID)
+	d.Set("secret", webhookEndpoint.Secret)
+
+	return nil
 }
 
-func resourceStripeWebhookEndpointRead(d *schema.ResourceData, m interface{}) error {
+func resourceStripeWebhookEndpointRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*client.API)
-	webhookEndpoint, err := client.WebhookEndpoints.Get(d.Id(), nil)
 
+	params := &stripe.WebhookEndpointParams{}
+	params.Context = ctx
+
+	webhookEndpoint, err := client.WebhookEndpoints.Get(d.Id(), params)
 	if err != nil {
-		return err
+		return diag.FromErr(err)
 	}
 
 	d.Set("url", webhookEndpoint.URL)
@@ -80,9 +88,11 @@ func resourceStripeWebhookEndpointRead(d *schema.ResourceData, m interface{}) er
 	return nil
 }
 
-func resourceStripeWebhookEndpointUpdate(d *schema.ResourceData, m interface{}) error {
+func resourceStripeWebhookEndpointUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*client.API)
-	params := stripe.WebhookEndpointParams{}
+
+	params := &stripe.WebhookEndpointParams{}
+	params.Context = ctx
 
 	if d.HasChange("url") {
 		params.URL = stripe.String(d.Get("url").(string))
@@ -96,22 +106,24 @@ func resourceStripeWebhookEndpointUpdate(d *schema.ResourceData, m interface{}) 
 		params.Connect = stripe.Bool(d.Get("connect").(bool))
 	}
 
-	_, err := client.WebhookEndpoints.Update(d.Id(), &params)
-
-	if err != nil {
-		return err
+	if _, err := client.WebhookEndpoints.Update(d.Id(), params); err != nil {
+		return diag.FromErr(err)
 	}
 
-	return resourceStripeWebhookEndpointRead(d, m)
+	return resourceStripeWebhookEndpointRead(ctx, d, m)
 }
 
-func resourceStripeWebhookEndpointDelete(d *schema.ResourceData, m interface{}) error {
+func resourceStripeWebhookEndpointDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*client.API)
-	_, err := client.WebhookEndpoints.Del(d.Id(), nil)
 
-	if err == nil {
-		d.SetId("")
+	params := &stripe.WebhookEndpointParams{}
+	params.Context = ctx
+
+	if _, err := client.WebhookEndpoints.Del(d.Id(), params); err != nil {
+		return diag.FromErr(err)
 	}
 
-	return err
+	d.SetId("")
+
+	return nil
 }
