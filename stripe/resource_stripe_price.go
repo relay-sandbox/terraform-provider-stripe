@@ -223,11 +223,15 @@ func resourceStripePriceCreate(ctx context.Context, d *schema.ResourceData, m in
 		params.Recurring = recurringParams
 	}
 
-	if unitAmount, ok := d.GetOk("unit_amount"); ok {
+	// TODO: The `GetOkExists` method is deprecated, but there is no other way to
+	// support setting prices to 0 when they are typed as integers and floats. Unit
+	// amounts should probably be typed as strings and tested for convertability to
+	// the desired numeric types, but that will likely break existing Terraform state.
+	if unitAmount, ok := d.GetOkExists("unit_amount"); ok {
 		params.UnitAmount = stripe.Int64(int64(unitAmount.(int)))
 	}
 
-	if unitAmountDecimal, ok := d.GetOk("unit_amount_decimal"); ok {
+	if unitAmountDecimal, ok := d.GetOkExists("unit_amount_decimal"); ok {
 		params.UnitAmountDecimal = stripe.Float64(unitAmountDecimal.(float64))
 	}
 
@@ -315,15 +319,15 @@ func expandPriceTier(d *schema.ResourceData, idx int) (*stripe.PriceTierParams, 
 		return nil, diag.Errorf("up_to: conflicts with up_to_inf")
 	}
 
-	if flatAmount, ok := d.GetOk(fmt.Sprintf("tier.%d.flat_amount", idx)); ok {
+	if flatAmount, ok := d.GetOkExists(fmt.Sprintf("tier.%d.flat_amount", idx)); ok {
 		params.FlatAmount = stripe.Int64(int64(flatAmount.(int)))
-	} else if flatAmountDecimal, ok := d.GetOk(fmt.Sprintf("tier.%d.flat_amount_decimal", idx)); ok {
+	} else if flatAmountDecimal, ok := d.GetOkExists(fmt.Sprintf("tier.%d.flat_amount_decimal", idx)); ok {
 		params.FlatAmountDecimal = stripe.Float64(flatAmountDecimal.(float64))
 	}
 
-	if unitAmount, ok := d.GetOk(fmt.Sprintf("tier.%d.unit_amount", idx)); ok {
+	if unitAmount, ok := d.GetOkExists(fmt.Sprintf("tier.%d.unit_amount", idx)); ok {
 		params.UnitAmount = stripe.Int64(int64(unitAmount.(int)))
-	} else if unitAmountDecimal, ok := d.GetOk(fmt.Sprintf("tier.%d.unit_amount_decimal", idx)); ok {
+	} else if unitAmountDecimal, ok := d.GetOkExists(fmt.Sprintf("tier.%d.unit_amount_decimal", idx)); ok {
 		params.UnitAmountDecimal = stripe.Float64(unitAmountDecimal.(float64))
 	}
 
